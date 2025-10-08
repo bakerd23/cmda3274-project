@@ -1,0 +1,90 @@
+---
+title: "Preliminary Player Ranking System"
+output: pdf_document
+date: "2025-10-08"
+---
+
+This project uses the cbbdata package developed by former Duke manager Andrew Weatherman. Read in packages:
+
+```{r}
+library(dplyr)
+library(cbbdata)
+```
+
+
+Read in the basic and advanced stats for all players in the 2025 season:
+
+```{r}
+all_ncaam_players_adv <- cbd_torvik_player_season(year = 2025) %>% select(player, exp, num, hgt, team, conf, g, mpg, ppg, oreb, dreb, apg, tov, spg, bpg, usg, ortg, efg, ts, year, id, ft_pct, two_pct, three_pct, dunk_pct, rim_pct, mid_pct, fg_pct, drtg, obpm, dbpm, bpm, oreb_rate, dreb_rate)
+
+all_ncaam_players <- cbd_torvik_player_season(year = 2025) %>% 
+  select(player, exp, hgt, team, conf, g, mpg, ppg, oreb, dreb, apg, tov, spg, bpg, fg_pct, three_pct, ft_pct)
+```
+
+Define a percentile function and make a percentile version of the player stats:
+
+```{r}
+to_percentile <- function(x) {
+  if (!is.numeric(x)) return(x)
+  n <- length(x)
+  if (n <= 1) return(rep(0, n))
+  if (all(x == x[1])) return(rep(0.5, n))
+  (rank(x, ties.method = "average") - 1) / (n - 1)
+}
+
+players_pct_adv <- all_ncaam_players_adv %>% mutate(across(everything(), ~ifelse(is.na(.), 0, .))) %>%
+  mutate(across(where(is.numeric), to_percentile))
+
+players_pct <- all_ncaam_players %>% mutate(across(everything(), ~ifelse(is.na(.), 0, .))) %>%
+  mutate(across(where(is.numeric), to_percentile))
+```
+
+Perform a Principal Component Analysis on the percentile data:
+
+```{r}
+version <- as.data.frame(players_pct)
+if ("tov" %in% names(version)) version$tov <- 1 - version$tov
+
+X  <- as.matrix(version[, sapply(version, is.numeric), drop = FALSE])
+pc <- prcomp(X, center = TRUE, scale. = TRUE)
+w  <- abs(pc$rotation[, 1]); w <- w / sum(w)
+version$score_pca_01 <- scale(as.vector(scale(X) %*% w))[,1]
+```
+
+Now scale by conference to account for level of competition:
+
+```{r}
+ncaa24 <- read.csv("C:/Users/bwdea/OneDrive/Documents/STAT 3274/Final Project/NCAA24-25.csv")
+ncaa24$School <- iconv(ncaa24$School, from = "latin1", to = "UTF-8")
+source("to_torvik_names.R")
+ncaa24$school <- to_torvik_names(ncaa24$School)
+
+agg <- aggregate(cbind(W, L) ~ conf, data = ncaa24, sum, na.rm = TRUE)
+agg$win_pct <- with(agg, W / (W + L))
+conf_w <- setNames(agg$win_pct, agg$conf)
+
+version$conf_w <- conf_w[version$conf]
+version$conf_w[is.na(version$conf_w)] <- mean(conf_w, na.rm = TRUE)
+```
+Finally z-score the computed rankings and output the result 
+
+```{r}
+version <- version %>%
+  mutate(
+    z_stats = scale(score_pca_01)[,1],
+    z_conf  = scale(conf_w)[,1]
+  )
+
+w_stats <- 0.9
+w_conf  <- 0.1
+
+version$combo <- w_stats*version$z_stats + w_conf *version$z_conf
+
+version$rating <- 100 * (version$combo - min(version$combo, na.rm=TRUE)) /
+                            (max(version$combo, na.rm=TRUE) - min(version$combo, na.rm=TRUE))
+
+ratings <- version[order(-version$rating), ]
+head(ratings[, c("player","conf","rating")], 10)
+
+```
+
