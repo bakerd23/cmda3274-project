@@ -8,8 +8,8 @@ suppressPackageStartupMessages(
 season = 2025
 
 # Paths
-players_path = here("data/raw/wcbb_players_2025.csv")
-map_path_txt = here("data/external/conf_name_map.txt")
+players_path = here("data/wcbb_players_2025.csv")
+map_path_txt = here("data/conf_name_map.txt")
 out_dir = here("data/processed")
 dir_create(out_dir)
 
@@ -187,4 +187,5 @@ players_enriched = players_joined %>%
 players_d1 = players_enriched %>% filter(!is.na(conference_name))
 
 readr::write_csv(players_enriched, file.path(out_dir, "wcbb_players_2025_with_team_conf_pos.csv"))
+
 readr::write_csv(players_d1, file.path(out_dir, "wcbb_players_2025_D1.csv"))
