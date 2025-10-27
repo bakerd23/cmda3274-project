@@ -1,9 +1,3 @@
-#' Convert NCAA names to Torvik-style names
-#'
-#' @param x character vector of school names
-#' @return character vector
-#' @examples
-#' to_torvik_names(c("Miami (OH)", "UMBC"))
 to_torvik_names <- function(x) {
   s <- as.character(x)
   s <- gsub("\u00A0", " ", s, fixed = TRUE)
@@ -35,3 +29,4 @@ to_torvik_names <- function(x) {
   s[!is.na(i)] <- unname(map[i[!is.na(i)]])
   s
 }
+
