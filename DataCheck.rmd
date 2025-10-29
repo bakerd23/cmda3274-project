@@ -1,0 +1,103 @@
+---
+title: "Final Project Data Check"
+author: Baker Dean and Caleb Ramsey
+output: html_document
+date: "2025-10-28"
+---
+
+```{r setup, include=FALSE}
+# Setup
+library(knitr)
+infile <- knitr::current_input()
+root <- if (is.null(infile)) getwd() else dirname(infile)
+knitr::opts_knit$set(root.dir = root)
+setwd(root)
+stopifnot(file.exists("hdi_name_matcher.R"))
+source("hdi_name_matcher.R", chdir = TRUE)
+```
+
+# Code
+
+```{r, message=FALSE, warning=FALSE}
+# Imports
+library(dplyr)
+library(stringr)
+library(cbbdata)
+
+# Bring in HDI 2023 file (downloaded from Google sheet)
+hdi23 <- read.csv("C:/Users/bwdea/OneDrive/Documents/STAT 3274/Final Project/Data/HDI Ratings 2023-24.csv")
+hdi23 <- hdi23 %>% rename(Name = Full.Name, Team = X2023.2024.School) %>% select(Name, Team, Rating)
+
+# Scrape barttorvik 2023 data using cbbdata API
+barttorvik_2023 <- cbd_torvik_player_season(year = 2024)
+barttorvik_2023 <- barttorvik_2023 %>% rename(Name = player, Team = team)
+
+# Join HDI ratings to the 2023 barttorvik data
+ratings_23 <- join_hdi_rating(barttorvik_2023, hdi23) %>% select(Name, pos, exp, hgt, Team, conf, mpg, ppg, rpg, apg, spg, bpg, two_pct, three_pct, ft_pct, tov, ast_to, efg, ts, usg, ortg, drtg, rim_pct, mid_pct, obpm, dbpm, bpm, ftr, pfr, HDI_Rating, year) %>% rename(Rating = HDI_Rating) %>% filter(!is.na(Rating)) #24 umatched
+basic_ratings_23 <- ratings_23 %>% select(Name, pos, exp, hgt, Team, conf, mpg, ppg, rpg, apg, spg, bpg, two_pct, three_pct, ft_pct, tov, ast_to, efg, ts, Rating, year)
+
+# Bring in HDI 2024 file (downloaded from Google sheet)
+hdi24 <- read.csv("C:/Users/bwdea/OneDrive/Documents/STAT 3274/Final Project/Data/HDI Ratings 2024-25.csv")
+hdi24 <- hdi24 %>% rename(Name = Full.Name, Team = X2024.2025.School) %>% select(Name, Team, Rating)
+
+# Scrape barttorvik 2024 data using cbbdata API
+barttorvik_2024 <- cbd_torvik_player_season(year = 2025)
+barttorvik_2024 <- barttorvik_2024 %>% rename(Name = player, Team = team)
+
+# Join HDI ratings to the 2024 barttorvik data
+ratings_24 <- join_hdi_rating(barttorvik_2024, hdi24) %>% select(Name, pos, exp, hgt, Team, conf, mpg, ppg, rpg, apg, spg, bpg, two_pct, three_pct, ft_pct, tov, ast_to, efg, ts, usg, ortg, drtg, rim_pct, mid_pct, obpm, dbpm, bpm, ftr, pfr, HDI_Rating, year) %>% rename(Rating = HDI_Rating) %>% filter(!is.na(Rating)) #153 Umatched
+basic_ratings_24 <- ratings_24 %>% select(Name, pos, exp, hgt, Team, conf, mpg, ppg, rpg, apg, spg, bpg, two_pct, three_pct, ft_pct, tov, ast_to, efg, ts, Rating, year)
+```
+
+# Datasets
+
+HDI 2023:
+
+```{r}
+head(hdi23)
+```
+
+barttorvik 2023:
+
+```{r}
+head(barttorvik_2023)
+```
+
+Full dataset for 2023 season:
+
+```{r}
+head(ratings_23)
+```
+
+HDI 2024:
+
+```{r}
+head(hdi24)
+```
+
+barttorvik 2024:
+
+```{r}
+head(barttorvik_2024)
+```
+
+Full dataset for 2024 season:
+
+```{r}
+head(ratings_24[order(-ratings_24$Rating), ], 10)
+```
+
+# Collection Process
+
+For the mens side of the project, collecting the data was a combination of webscraping and dataset manipulation. HDI is a company that provides a rating system for college basketball players using a variety of advanced statistics. After accessing their data via a Google Sheet that the Virginia Tech Men's Basketball team provided, the HDI ratings and stats were downloaded to a csv that could be imported into this R project. Since part of the goal includes simplify the equation that makes player ratings, the cbbdata package developed by Andrew Weatherman was used to scrape data from barttorvik.com for the corresponding seasons. After obtaining both of these datasets the two were joined using a customized function to assing HDI ratings to almost all of the players in the barttorvik dataset. Rows that contained NA values and players that only appeared in one of the datasets were removed and special care was taken to handle difficult cases like multiple players with the same name.  
+
+# References
+
+Kartes, Weston. MBB Player Database 2024. HD Intelligence. https://www.hdintelligence.com/mbb-player-database-2024 
+
+Kartes, Weston. MBB Player Database 2025. HD Intelligence. https://www.hdintelligence.com/mbb-player-database-2025 
+
+Torvik, Bart. NCAAM Player Stats 2024. barttorvik. https://barttorvik.com/playerstat.php?year=2024 
+
+Torvik, Bart. NCAAM Player Stats 2025. barttorvik. https://barttorvik.com/playerstat.php?year=2025 
+
