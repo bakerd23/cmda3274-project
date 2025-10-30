@@ -19,8 +19,8 @@ MIN_MINUTES = 200
 MIN_GAMES   = 10
 
 season = 2025
-players_path = here("data/wcbb_players_2025_D1.csv")
-out_dir = here("data/processed"); dir_create(out_dir)
+players_path = here("main/wcbb_players_2025_D1.csv")
+out_dir = here("main/processed"); dir_create(out_dir)
 
 # Helper functions
 mode_non_na = function(x)
@@ -166,7 +166,7 @@ team_conf_auto =
   dplyr::mutate(team_name = dplyr::coalesce(team_name, team_name_meta)) %>%
   dplyr::select(team_id, team_name, conference_name, conference_id)
 
-map_file = "C:/Users/caleb/Downloads/conf_name_map.txt"
+map_file = "main/conf_name_map.txt"
 if (file.exists(map_file)) {
   map_lines = readLines(map_file)
   map_df = tibble::tibble(raw = map_lines) %>%
@@ -225,3 +225,4 @@ players_enriched =
   dplyr::filter(conference_name %in% D1_CONF)
 
 readr::write_csv(players_enriched, file.path(out_dir, "wcbb_players_2025_with_team_conf_pos.csv"))
+
