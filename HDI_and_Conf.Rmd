@@ -1,0 +1,209 @@
+---
+title: "HDI + Conference Context (2025)"
+author: "Caleb Ramsey & Baker Dean"
+date: "11-10-25"
+output: pdf_document
+---
+
+```{r Libraries}
+library(dplyr); library(readr); library(stringr)
+```
+
+## Overview
+
+Goal: start from HDI player ratings (men & women) and apply a simple conference-strength adjustment to compare HDI to our own model that uses conference weighting and strength of schedule.
+
+```{r Setup}
+season = 2025
+
+# HDI inputs
+path_women_hdi = file.path("main", "women_4099.csv")
+path_men_hdi = file.path("main", "men_4099.csv")
+
+# Women: team & conference z-scores
+path_w_teamkeys = file.path("main", "wbb_team_conf_zkeys_2025.csv")
+path_w_confz = file.path("main", "wbb_conf_z_2025.csv")
+
+# Men: manual conference mapping (one line per school)
+path_confmap_men = file.path("main", "conf_map_men.txt")
+
+# Map outputs
+out_women_conf = file.path("main", "women_hdi_conf_2025.csv")
+out_men_conf = file.path("main", "men_hdi_conf_2025.csv")
+```
+
+```{r Helper functions}
+clean_name = function(x)
+  {
+  x = iconv(x, to = "ASCII//TRANSLIT")
+  x = tolower(x)
+  x = gsub("[^a-z\\s]", " ", x)
+  x = gsub("\\s+", " ", x)
+  trimws(x)
+  }
+
+std = function(v)
+  {
+  v = as.numeric(v)
+  v[!is.finite(v)] = NA_real_
+  if(all(is.na(v)))return(rep(0, length(v)))
+  s = sd(v, na.rm = T)
+  if(!is.finite(s) || s == 0)return(rep(0, length(v)))
+  (v - mean(v, na.rm = T))/s
+  }
+```
+
+## Women: HDI & Conf z-score
+Use women's z-scores and conference z to define conference tiers, then apply additive & multiplicative adjustments to ratings.
+
+```{r Women's: Conf Mapping & Conf Scores}
+# Only D1
+valid_conf_ids = 1:32
+
+# Base is 90 for "no discount" reference point
+adjust_hdi_with_conf_w = function(hdi_df, team_keys_df, conf_df, base = 90)
+  {
+  #Normalize HDI column names
+  nms = tolower(names(hdi_df))
+  names(hdi_df)[match("name", nms, 0)] = "Player"
+  names(hdi_df)[match("player", nms, 0)] = "Player"
+  names(hdi_df)[match("school", nms, 0)] = "School"
+  names(hdi_df)[match("rating", nms, 0)] = "Rating"
+  stopifnot(all(c("Player","School","Rating") %in% names(hdi_df)))
+  
+  hdi_df = hdi_df %>%
+    mutate(team_key = clean_name(School))
+  
+  # Join team z, SOS, and conference z
+  joined = hdi_df %>%
+    left_join(team_keys_df, by = "team_key") %>%
+    left_join(conf_df, by = "conference_id") %>%
+    mutate(
+      team_z = coalesce(team_z, 0),
+      sos_z = coalesce(sos_z, 0),
+      conf_z = coalesce(conf_z, 0)
+      )
+  
+  # Standardize conference z over matched set; bucket into tiers
+  conf_z_std = std(joined$conf_z)
+  
+  joined %>%
+    mutate(
+      conf_z_std = conf_z_std,
+      conf_tier = case_when(
+        conf_z_std >= 0.8 ~ "tier1", # top leagues
+        conf_z_std >= -0.2 ~ "mid", # middle
+        T ~ "low" # bottom
+        ),
+
+  # Simple additive bump/penalty
+  penalty_conf = case_when(
+    conf_tier == "tier1" ~  0.8,
+    conf_tier == "mid" ~ -0.4,
+    conf_tier == "low" ~ -2.0,
+    T ~  0
+    ),
+  Rating_add = pmin(pmax(Rating + penalty_conf, 40), 99),
+  
+  # Multiplicative shrink on the gap above base
+  conf_mult = case_when(
+    conf_tier == "tier1" ~ 1.00,
+    conf_tier == "mid" ~ 0.90,
+    conf_tier == "low" ~ 0.70,
+    T ~ 1.00
+    ),
+  gap = pmax(Rating_add - base, 0),
+  Rating_conf = base + gap * conf_mult,
+  Rating_conf = pmin(pmax(Rating_conf, 40), 99)
+  )
+  }
+```
+
+```{r Women's: Apply}
+team_w = read_csv(path_w_teamkeys, show_col_types = F) %>%
+  mutate(team_key = clean_name(team_key))
+
+conf_w = read_csv(path_w_confz, show_col_types = F) %>%
+  select(conference_id, conf_z)
+
+women_hdi_raw = read_csv(path_women_hdi, show_col_types = F)
+
+women_hdi_conf = adjust_hdi_with_conf_w(
+  hdi_df = women_hdi_raw,
+  team_keys_df = team_w,
+  conf_df = conf_w,
+  base = 90
+  )
+
+# Write final file
+write_csv(women_hdi_conf, out_women_conf)
+```
+
+## Men: HDI & manual conference tiers
+Men's side uses a manual mapping from school to conference and then same scaling logic by tier.
+
+```{r Men's: Conf Mapping & Apply}
+men_raw = read_csv(path_men_hdi, show_col_types = F)
+
+# Normalize columns to Player, School, Rating
+nms_m = tolower(names(men_raw))
+
+names(men_raw)[match("name", nms_m, 0)] = "Player"
+
+conf_map_m = read.table(
+  path_confmap_men,
+  sep = "=",
+  strip.white = T,
+  col.names = c("School_raw","Conf"),
+  comment.char = "",
+  quote = ""
+  ) %>% mutate(
+    School_key = clean_name(School_raw),
+    Conf = trimws(Conf)
+    )
+
+men_join = men_raw %>%
+  mutate(School_key = clean_name(School)) %>%
+  left_join(conf_map_m %>% select(School_key, Conf), by = "School_key")
+
+base = 90
+
+# Can tune these lists if we want to re-bucket conferences
+tier1_confs = c("SEC","Big Ten","Big East","B12","ACC","Mountain West")
+mid_confs = c("AAC","A10","WCC","MVC","CUSA","Pac 12","Sun Belt","WAC")
+
+men_hdi_conf = men_join %>%
+  mutate(
+    conf_tier = case_when(
+      Conf %in% tier1_confs ~ "tier1",
+      Conf %in% mid_confs ~ "mid",
+      is.na(Conf) ~ "unknown",
+      T ~ "low"
+      ),
+
+  # Additive bump/hit
+  penalty_conf = case_when(
+    conf_tier == "tier1" ~  0.8,
+    conf_tier == "mid" ~ -0.4,
+    conf_tier == "low" ~ -2.0,
+    T ~  0.0
+    ), 
+
+  Rating_add = pmin(pmax(Rating + penalty_conf, 40), 99),
+
+  # Multiplicative shrink on gap above base
+  conf_mult = case_when(
+    conf_tier == "tier1" ~ 1.00,
+    conf_tier == "mid" ~ 0.90,
+    conf_tier == "low" ~ 0.70,
+    T ~ 1.00
+    ),
+
+  gap = pmax(Rating_add - base, 0),
+  Rating_conf = base + gap * conf_mult,
+  Rating_conf = pmin(pmax(Rating_conf, 40), 99)
+  )
+
+# Write final file
+write_csv(men_hdi_conf, out_men_conf)
+```
