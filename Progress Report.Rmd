@@ -16,6 +16,8 @@ ratings_23 <- read.csv("Data/ratings_23.csv")
 ratings_24 <- read.csv("Data/ratings_24.csv")
 hdi23 <- read.csv("Data/HDI Ratings 2023-24.csv")
 hdi24 <- read.csv("Data/HDI Ratings 2024-25.csv")
+wbb_final_ratings = read.csv("Data/wcbb_final_ratings.csv")
+conf_strength_named = read.csv("Data/mbb_conf_strength_named.csv")
 ```
 
 # Research Question
@@ -170,8 +172,67 @@ For women's basketball, we constructed team and conference strength using ESPN W
 We then computed strength-of-schedule (SOS) by pairing each game with its opponent and averaging opponent team-strength z-scores, using a weight of 0.9 for home games and 1.1 for road games to reflect the added difficulty of road atmospheres. This produced a raw SOS value per team, which we standardized to sos_z. To move from teams to conferences, we linked each team to a conference_name from the player table, averaged team-strength values within each conference, and standardized those conference means to obtain a conference-strength z-score conf_z. Finally, we merged team_z, sos_z, and conf_z back into the women's player table (players_enriched_avg) and flagged Power 5 teams (conf_tier_pow5) so that team strength, schedule, and conference tier could all be incorporated into the final women's rating formula. 
 
 ```{r, message=FALSE, warning=FALSE, include=FALSE}
-# Conference strength distribution visualization and analysis
+conf_men = conf_strength_named %>%
+  transmute(
+    gender = "Men",
+    conference = as.factor(conference_id),
+    conf_strength_z = conf_strength_z,
+    conf_sos_z = conf_sos_z
+    )
+
+conf_women = wcbb_final_ratings %>%
+  group_by(conf) %>%
+  summarise(
+    avg_team_z = mean(team_z, na.rm = T),
+    avg_sos_z = mean(sos_z, na.rm = T),
+    .groups = "drop"
+    ) %>%
+  mutate(
+    conf_strength_z = as.numeric(scale(avg_team_z)),
+    conf_sos_z = as.numeric(scale(avg_sos_z))
+    ) %>%
+  transmute(
+    gender = "Women",
+    conference = conf,
+    conf_strength_z,
+    conf_sos_z
+    )
+
+conf_both = bind_rows(conf_men, conf_women)
+
+conf_scatterplot = ggplot(conf_both, aes(x = conf_strength_z, 
+                                  y = conf_sos_z, 
+                                  color = gender)) +
+  geom_hline(yintercept = 0, linewidth = 0.3) +
+  geom_vline(xintercept = 0, linewidth = 0.3) +
+  geom_point(size = 2, alpha = 0.8) +
+  labs(
+    title = "Conference Strength vs. Strength of Schedule",
+    x = "Conference strength (z-score)",
+    y = "Conference SOS (z-score)",
+    color = "Gender"
+    ) +
+  theme_minimal(base_size = 11)
+
+conf_hist = ggplot(conf_both, aes(x = conf_strength_z)) +
+  geom_histogram(bins = 10) +
+  facet_wrap(~ gender, ncol = 1) +
+  labs(
+    title = "Distribution of Conference Strength (z-scores) by Gender",
+    x = "Conference strength (z-score)",
+    y = "Count"
+    ) + theme_minimal(base_size = 11)
 ```
+```{r}
+print(conf_scatterplot)
+print(conf_hist)
+```
+
+The histograms indicate that men’s conferences vary more widely in strength, while women’s conferences are more tightly clustered with only a few elite outliers. 
+
+The scatterplot confirms a strong positive relationship between conference strength and schedule difficulty for both genders. Stronger conferences consistently play harder schedules, while weaker conferences play softer ones. 
+
+These findings demonstrate that conference environment has a meaningful impact on player's stats and supports the need for conference-adjusted ratings in our model.
 
 # Analysis
 
@@ -290,3 +351,4 @@ ESPN Women's college basketball data (via `wehoop`)
 ESPN 2025 schedules and boxscores (via `wehoop`) 
 
 Hird, K. `wehoop`: Women's Basketball Data for R: https://github.com/sportsdataverse/wehoop
+
