@@ -29,18 +29,21 @@ How can we create a player rating system for men’s and women’s college baske
 
 ## Abstract
 
-In this new age of college basketball, evaluating the talent of players across the nation is more important than ever given the new transfer portal and Name, Image, and Likeness (NIL) rules. Player movement is at an all-time high with teams often turning over more than 75% of their teams every offseason and with players able to be paid for their services coaches and general managers must be aware of the true value of a player, how much to offer him/her and how to allocate all their financial resources. With many players choosing to move between the Power 5 conferences (ACC, Big Ten, Big 12, Big East, and SEC) and the many smaller conferences, evaluating the skill and fit of a player is not as simple as simply pulling ups stats and sorting by points per game. With such a wide variety of levels of talent, determining how to account for the level of competition they faced becomes an important factor alongside the performance of the player.
+Player evaluation has become more complex than ever in this era of transfer portal and Name, Image, and Likeness (NIL) rules. Player movement is at an all-time high with teams often turning over more than 75% of their teams every offseason and with players able to be paid for their services coaches and general managers must be aware of the true value of a player, how much to offer him/her and how to allocate all their financial resources. With many players choosing to move between the Power 5 conferences (ACC, Big Ten, Big 12, Big East, and SEC) and the many smaller conferences, evaluating the skill and fit of a player is not as simple as simply pulling ups stats and sorting by points per game. With such a wide variety of levels of talent, determining how to account for the level of competition they faced becomes an important factor alongside the performance of the player.
 
-This project seeks to accurately handle this issue by creating a video-game style player ratings system that will assign every player in the nation a single number that represents the level of competition they faced and their individual performance. We will determine level of competition by analyzing the conference the player played and rate their stats using a model based on previously existing but potentially flawed rankings. We will apply our ratings to the 2024-25 season to evaluate its accuracy since we have full data for that season but the end-goal is a tool that can be used to rank and project player performance when scouting transfer portal players. 
+This project develops a video-game style player ratings system that combines box-score performance with measures of conference strength and schedule difficulty. We use existing HDI ratings as a baseline model for men's data, then extend,scale, and adapt that framework to the women's game. After constructing conference-level strength metrics, we apply adjustments that account for opponent difficulty and competitive environment. Our long-term goal is a transferable rating system that supports coaching staffs in scouting, rescruiting, and evaluating transfer-portal talent.
 
 # Methods
-![Pipeline Diagram]("Data/Pipeline_Diagram.png")
+![Pipeline Diagram](Data/Pipeline_Diagram.png)
 
 ## Data Collection
 
 ### Men's
 
-For the men's side of the project, collecting the data was a combination of web-scraping and dataset manipulation. HDI is a company that provides a rating system for college basketball players using a variety of advanced statistics. After accessing their data via a Google Sheet that the Virginia Tech Men's Basketball team provided, the HDI ratings and stats were downloaded to a csv that could be imported into this R project. Since part of the goal includes simplify the equation that makes player ratings, the `cbbdata` package (Weatherman, 2024) was used to scrape data from barttorvik.com for the corresponding seasons. After obtaining both of these datasets the two were joined using a customized function to assign HDI ratings to almost all of the players in the barttorvik dataset. Rows that contained NA values and players that only appeared in one of the datasets were removed and special care was taken to handle difficult cases like multiple players with the same name.
+Men's data was collected through two primary sources:
+1. HDI ratings & player statistics, accessed through a Google Sheet provided by Virginia Tech Men's Basketball staff and downloaded as a CSV.
+2. Barttorvik statistics, scraped using the `cbbdata` package (Weatherman, 2024) for the corresponding seasons.
+The two datasets were joined using a custom matching function designed to handle inconsistencies in naming and duplicate names across teams. Players appearing in only one dataset or with incomplete records were removed.
 
 ```{r, include=FALSE}
 model_data_printing <- read.csv("Data/ratings_24.csv") %>% select(
@@ -64,8 +67,7 @@ model_data_printing <- read.csv("Data/ratings_24.csv") %>% select(
       a_to = ast_to)
 ```
 ```{r, include=FALSE}
-d1 = head(model_data_printing,5)
-kable(d1)
+kable(head(model_data_printing,5))
 ```
 ```{r, include=FALSE}
 mbb_raw_printing <- mbb_raw %>% select(
@@ -88,16 +90,18 @@ mbb_raw_printing <- mbb_raw %>% select(
       a_to = ast_to) %>%
   arrange(Name)
 ```
-```{r}
-d2 = head(mbb_raw_printing,5)
-kable(d2)
+```{r, include = FALSE}
+kable(head(mbb_raw_printing,5))
 ```
 
-This is the data we will use to assign the men's ratings.
+We use these cleaned data as the basis for the men’s rating model.
 
 ### Women's
 
-Data came from ESPN via the `wehoop` package (Gilani & Hutchinson, 2021). We used `load_wbb_player_box()` to collect the 2025 WBB game-by-game box scores and aggregated them into season totals. The 2025 schedule was collected with `load_wbb_schedule` and mapped each team to a conference using available team/conference fields. Manual overrides were added for teams with missing or amiguous conference labels. Minutes listed as "MM:SS" were normalized to decimal minutes, and percentage fields with zero denominators were set to NA. We filtered to Division I teams and enforced a minimum threshold (Minutes = 200, Games Played = 10). 
+Women's data were collected from ESPN via the `wehoop` package (Gilani & Hutchinson, 2021):
+* `load_wbb_player_box()` provided game-level box scores for all players in the 2025 season.
+* `load_wbb_schedule` provided team IDs, opponents, and conference fields used in conference assignment.
+We aggregated player box scores to season totals and standardized minutes, shooting percentages, and efficiency metrics. Teams with ambiguous conference IDs were resolved manually. We restricted the dataset to Division I teams and enforced a minimum threshold (Minutes = 200, Games Played = 10). 
 
 ```{r, include=FALSE}
 wbb_raw_printing <- wbb_raw %>% mutate(
@@ -136,34 +140,38 @@ wbb_raw_printing <- wbb_raw %>% mutate(
   select(-team_name) %>%
   arrange(player_name)
 ```
-```{r}
-d3 = head(wbb_raw_printing,5)
-kable(d3)
+```{r, include = FALSE}
+kable(head(wbb_raw_printing,5))
 ```
 
-This is the data we will use to assign the women's ratings.
+These processed data serve as the basis for the women’s rating model.
 
 ## Data Manipulation
 
-After gathering the HDI stats for the men, we trained a random forest model on the data to predict each player's rating from per-game and efficiency statistics: on points per game (ppg), rebounds per game (rpg), assists per game (apg), steals per game (spg), blocks per game (bpg), 2 point shot percentage (two_pct), 3 point shot percentage (three_pct), free throw percentage (ft_pct), turnovers per game (tov), assist to turnover ratio (a_to), effective field goal percentage (efg), true shooting percentage (ts), and free throw rate (ftr). We then applied this model to the men's and women's data to assign each player a "statistics score".
+### Men's Statistical Model
 
-On the women's side, ESPN's women's data do not reliably include player positions and no stable scraping was found for positional labels, we generated our own position buckets using a rule-based approach. Players were grouped into guards, wings, or centers, using height, usage-rate, assist-rate, and rebound profile. Guards were defined by high assist rates and perimeter shooting volume, wings by balanced scoring and rebounding profiles, and centers by high rebound and low three-point attempt rates. These buckets were not created to be perfect positional labels; rather, they ensured players were evaluated with role-appropriate scoring formulas rather than a single one-size-fits-all approach. This prevented guards from being penalized for low rebounding and centers from being penalized for low assist rates as their roles within a teams context are very different. We also computed per-game, per-40, and advanced metrics (such as TS%, eFG%, and tendency rates) and converted them into percentile scores. We then used the aforementioned role weights and applied shrinkage and penalties based on minutes, role, and rotation rank. Finally, we combined the position-adjusted stat-score with team and opponent strength-of-schedule and conference strength z-scores, and rescaled the composite to a 2K-style 40-99 rating. This yields a women's "statistics score" that incorporates both box-score production and context. 
-\newpage
-Men's:
+We trained a random forest model to predict HDI ratings using per-game and efficiency statistics, including:
 
-```{r}
-d4 = head(men_4099,5)
-kable(d4)
+* points, rebounds, assists, steals, and blocks per game (ppg, rpg, apg, spg, and bpg)
+* shooting efficiency (2P%, 3P%, FT%)
+* effective field goal percentage (eFG%)
+* true shooting percentage (TS%)
+* turnovers and assist-to-turnover ratio (A/TO)
+* free-throw rate (FTR)
+
+This model produces a statistics score that captures each player’s individual production independent of conference effects. We apply this model to both the men's and women's datasets.
+
+```{r, include = FALSE}
+kable(head(men_4099,5))
 ```
 
-Women's:
+### Women's Role-Adjusted Model
 
-```{r}
-d5 = head(women_4099,5)
-kable(d5)
+ESPN’s women’s data do not include reliable positional labels, so we created three role buckets: guard, wing, center. These buckets use simple rules based on height, assist rate, rebounding profile, and shooting tendencies. The goal was not perfect positional classification, but to ensure players were evaluated relative to the expectations of their role. For each player we computed per-game and advanced metrics (TS%, eFG%, usage proxies) and converted them into percentile scores. We then combined these percentiles with role-specific weights. Finally, we integrated team strength, opponent strength-of-schedule, and conference strength to produce a composite rating scaled to 40–99.
+
+```{r, include = FALSE}
+kable(head(women_4099,5))
 ```
-
-Looking at the outputs it is obvious that we are not finished with the project since players from Ball State and Duquesne are not the top players in the nation but instead putting up excellent stats on bad teams against poor competition. This justifies the need for some form of conference weighting which we will accomplish using strength of schedule and conference performance numbers.
 
 ## Conference Strength Modeling
 
@@ -370,7 +378,3 @@ Torvik, Bart. NCAAM Player Stats 2024. barttorvik. https://barttorvik.com/player
 Torvik, Bart. NCAAM Player Stats 2025. barttorvik. https://barttorvik.com/playerstat.php?year=2025 
 
 Gilani & Hutchinson. `wehoop`: Women's Basketball Data for R: https://github.com/sportsdataverse/wehoop
-
-
-
-
