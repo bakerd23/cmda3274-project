@@ -41,9 +41,15 @@ This project develops a video-game style player ratings system that combines box
 ### Men's
 
 Men's data was collected through two primary sources:
-1. HDI ratings & player statistics, accessed through a Google Sheet provided by Virginia Tech Men's Basketball staff and downloaded as a CSV.
-2. Barttorvik statistics, scraped using the `cbbdata` package (Weatherman, 2024) for the corresponding seasons.
-The two datasets were joined using a custom matching function designed to handle inconsistencies in naming and duplicate names across teams. Players appearing in only one dataset or with incomplete records were removed.
+
+1\.
+HDI ratings & player statistics, accessed through a Google Sheet provided by Virginia Tech Men's Basketball staff and downloaded as a CSV.
+
+2\.
+Barttorvik statistics, scraped using the `cbbdata` package (Weatherman, 2024) for the corresponding seasons.
+
+The two datasets were joined using a custom matching function designed to handle inconsistencies in naming and duplicate names across teams.
+Players appearing in only one dataset or with incomplete records were removed.
 
 ```{r, include=FALSE}
 model_data_printing <- read.csv("Data/ratings_24.csv") %>% select(
@@ -378,3 +384,4 @@ Torvik, Bart. NCAAM Player Stats 2024. barttorvik. https://barttorvik.com/player
 Torvik, Bart. NCAAM Player Stats 2025. barttorvik. https://barttorvik.com/playerstat.php?year=2025 
 
 Gilani & Hutchinson. `wehoop`: Women's Basketball Data for R: https://github.com/sportsdataverse/wehoop
+
