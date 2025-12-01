@@ -145,7 +145,7 @@ This is the data we will use to assign the women's ratings.
 
 ## Data Manipulation
 
-After gathering the HDI stats for the men, we trained a random forest model on the data to predict each player's rating from per-game and efficiency statistics: on ppg (points per game), rpg (rebounds per game), apg (assists per game), spg (steals per game), bpg (blocks per game), two_pct (2 point shot percentage), three_pct (3 point shot percentage), ft_pct (free throw percentage), tov (turnovers per game), ast_to (assist to turnover ratio), efg (effective field goal percentage), ts (true shooting percentage), and ftr (free throw rate). We then applied this model to the men's and women's data to assign each player a "statistics score".
+After gathering the HDI stats for the men, we trained a random forest model on the data to predict each player's rating from per-game and efficiency statistics: on points per game (ppg), rebounds per game (rpg), assists per game (apg), steals per game (spg), blocks per game (bpg), 2 point shot percentage (two_pct), 3 point shot percentage (three_pct), free throw percentage (ft_pct), turnovers per game (tov), assist to turnover ratio (a_to), effective field goal percentage (efg), true shooting percentage (ts), and free throw rate (ftr). We then applied this model to the men's and women's data to assign each player a "statistics score".
 
 On the women's side, ESPN's women's data do not reliably include player positions and no stable scraping was found for positional labels, we generated our own position buckets using a rule-based approach. Players were grouped into guards, wings, or centers, using height, usage-rate, assist-rate, and rebound profile. Guards were defined by high assist rates and perimeter shooting volume, wings by balanced scoring and rebounding profiles, and centers by high rebound and low three-point attempt rates. These buckets were not created to be perfect positional labels; rather, they ensured players were evaluated with role-appropriate scoring formulas rather than a single one-size-fits-all approach. This prevented guards from being penalized for low rebounding and centers from being penalized for low assist rates as their roles within a teams context are very different. We also computed per-game, per-40, and advanced metrics (such as TS%, eFG%, and tendency rates) and converted them into percentile scores. We then used the aforementioned role weights and applied shrinkage and penalties based on minutes, role, and rotation rank. Finally, we combined the position-adjusted stat-score with team and opponent strength-of-schedule and conference strength z-scores, and rescaled the composite to a 2K-style 40-99 rating. This yields a women's "statistics score" that incorporates both box-score production and context. 
 \newpage
@@ -370,6 +370,7 @@ Torvik, Bart. NCAAM Player Stats 2024. barttorvik. https://barttorvik.com/player
 Torvik, Bart. NCAAM Player Stats 2025. barttorvik. https://barttorvik.com/playerstat.php?year=2025 
 
 Gilani & Hutchinson. `wehoop`: Women's Basketball Data for R: https://github.com/sportsdataverse/wehoop
+
 
 
 
