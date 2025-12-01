@@ -169,7 +169,11 @@ Looking at the outputs it is obvious that we are not finished with the project s
 
 ### Men's 
 
-For men's basketball, we estimated team strength directly from scoring margins using ESPN game results via the hoopR::load_mbb_schedule() function. We restricted to D1 matchups (conf IDs: 1-32) and constructed a matrix where each row encoded a game, with a +1 for the home team, -1 for the away team, andd a shared intercept column. We then solved a least-squares system: $(A^T(A) + \lambda(I))\beta = A^T(y)$ where y is the home-away score margin and $\lambda = 10^{-2}$ is a small penalty. The resulting coefficients were centered with mean zero and then standardized to a z-score, yielding a latent team strength measure (team_z) for each team. 
+For men's basketball, we estimated team strength directly from scoring margins using ESPN game results via the hoopR::load_mbb_schedule() function. We restricted to D1 matchups (conf IDs: 1-32) and constructed a matrix where each row encoded a game, with a +1 for the home team, -1 for the away team, andd a shared intercept column. We then solved a least-squares system: 
+
+$$(A^T(A) + \lambda(I))\beta = A^T(y)$$
+
+where y is the home-away score margin and $\lambda = 10^{-2}$ is a small penalty. The resulting coefficients were centered with mean zero and then standardized to a z-score, yielding a latent team strength measure (team_z) for each team. 
 
 To quantify strength-of-schedule (SOS), we paired each game with its opponent and averaged opponent team_z values weighted by a small home/away factor (0.9 for a home games and 1.1 for road games). This produced a raw SOS measure for each team, which we standardized to sos_z. Finally, we aggregated to the conference level by averaging team_z and sos_z within each conference and converting these conference means to z-scores (conf_strength_z and conf_sos_z). These two standardized conference-level quantities form inputs to the conference index.
 
@@ -366,5 +370,6 @@ Torvik, Bart. NCAAM Player Stats 2024. barttorvik. https://barttorvik.com/player
 Torvik, Bart. NCAAM Player Stats 2025. barttorvik. https://barttorvik.com/playerstat.php?year=2025 
 
 Gilani & Hutchinson. `wehoop`: Women's Basketball Data for R: https://github.com/sportsdataverse/wehoop
+
 
 
