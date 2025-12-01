@@ -29,12 +29,16 @@ How can we create a player rating system for men’s and women’s college baske
 
 ## Abstract
 
-Player evaluation has become more complex than ever in this era of transfer portal and Name, Image, and Likeness (NIL) rules. Player movement is at an all-time high with teams often turning over more than 75% of their teams every offseason and with players able to be paid for their services coaches and general managers must be aware of the true value of a player, how much to offer him/her and how to allocate all their financial resources. With many players choosing to move between the Power 5 conferences (ACC, Big Ten, Big 12, Big East, and SEC) and the many smaller conferences, evaluating the skill and fit of a player is not as simple as simply pulling ups stats and sorting by points per game. With such a wide variety of levels of talent, determining how to account for the level of competition they faced becomes an important factor alongside the performance of the player.
+Player evaluation has become more complex than ever in this era of transfer portal and Name, Image, and Likeness (NIL) rules. Player movement is at an all-time high with teams often turning over more than 75% of their teams every offseason and with players able to be paid for their services coaches and general managers must be aware of the true value of a player, how much to offer him/her and how to allocate all their financial resources. With many players choosing to move between the Power 5 conferences (ACC, Big Ten, Big 12, Big East, and SEC) and the many smaller conferences, evaluating the skill and fit of a player is not as simple as simply pulling up stats and sorting by points per game. With such a wide variety of levels of talent, determining how to account for the level of competition they faced becomes an important factor alongside the performance of the player.
 
-This project develops a video-game style player ratings system that combines box-score performance with measures of conference strength and schedule difficulty. We use existing HDI ratings as a baseline model for men's data, then extend,scale, and adapt that framework to the women's game. After constructing conference-level strength metrics, we apply adjustments that account for opponent difficulty and competitive environment. Our long-term goal is a transferable rating system that supports coaching staffs in scouting, rescruiting, and evaluating transfer-portal talent.
+This project develops a video-game style player ratings system that combines box-score performance with measures of conference strength and schedule difficulty. We use existing HDI ratings (Kartes, 2024) as a baseline model for men's data, then extend,scale, and adapt that framework to the women's game. After constructing conference-level strength metrics, we apply adjustments that account for opponent difficulty and competitive environment. Our long-term goal is a transferable rating system that supports coaching staffs in scouting, rescruiting, and evaluating transfer-portal talent.
 
 # Methods
-![Pipeline Diagram](Data/Pipeline_Diagram.png)
+```{r fig.cap = "Figure 1. Pipeline diagram", out.width = "80%"}
+include_graphics("Data/Pipeline_Diagram.png")
+```
+
+Figure 1 illustrates the four-step pipeline used in this project: data collection, cleaning, modeling, and conference adjustment.
 
 ## Data Collection
 
@@ -46,35 +50,11 @@ Men's data was collected through two primary sources:
 HDI ratings & player statistics, accessed through a Google Sheet provided by Virginia Tech Men's Basketball staff and downloaded as a CSV.
 
 2\.
-Barttorvik statistics, scraped using the `cbbdata` package (Weatherman, 2024) for the corresponding seasons.
+Barttorvik statistics (Torvik, 2024), scraped using the `cbbdata` package (Weatherman, 2024) for the corresponding seasons.
 
 The two datasets were joined using a custom matching function designed to handle inconsistencies in naming and duplicate names across teams.
 Players appearing in only one dataset or with incomplete records were removed.
 
-```{r, include=FALSE}
-model_data_printing <- read.csv("Data/ratings_24.csv") %>% select(
-  mpg, ppg, rpg, apg, spg, bpg, two_pct, three_pct, ft_pct, tov, ast_to, efg, ts, Rating) %>% mutate(
-    mpg = round(mpg),
-    ppg = round(ppg,1),
-    rpg = round(rpg,1),
-    apg = round(apg,1),
-    spg = round(spg,1),
-    bpg = round(bpg,1),
-    two_pct = round(two_pct*100,1),
-    three_pct = round(three_pct*100,1),
-    ft_pct = round(ft_pct*100,1),
-    tov = round(tov,1),
-    ast_to = round(ast_to,2),
-    ts = round(ts,1)) %>% rename(
-      `2%` = two_pct,
-      `3%` = three_pct,
-      `ft%` = ft_pct,
-      Rtg = Rating,
-      a_to = ast_to)
-```
-```{r, include=FALSE}
-kable(head(model_data_printing,5))
-```
 ```{r, include=FALSE}
 mbb_raw_printing <- mbb_raw %>% select(
   Name, mpg, ppg, rpg, apg, spg, bpg, two_pct, three_pct, ft_pct, tov, ast_to, efg, ts) %>% mutate(
@@ -97,7 +77,31 @@ mbb_raw_printing <- mbb_raw %>% select(
   arrange(Name)
 ```
 ```{r, include = FALSE}
-kable(head(mbb_raw_printing,5))
+kable(head(mbb_raw_printing,5), caption = "Table 2. Example of raw men's model data")
+```
+```{r, include=FALSE}
+model_data_printing <- read.csv("Data/ratings_24.csv") %>% select(
+  mpg, ppg, rpg, apg, spg, bpg, two_pct, three_pct, ft_pct, tov, ast_to, efg, ts, Rating) %>% mutate(
+    mpg = round(mpg),
+    ppg = round(ppg,1),
+    rpg = round(rpg,1),
+    apg = round(apg,1),
+    spg = round(spg,1),
+    bpg = round(bpg,1),
+    two_pct = round(two_pct*100,1),
+    three_pct = round(three_pct*100,1),
+    ft_pct = round(ft_pct*100,1),
+    tov = round(tov,1),
+    ast_to = round(ast_to,2),
+    ts = round(ts,1)) %>% rename(
+      `2%` = two_pct,
+      `3%` = three_pct,
+      `ft%` = ft_pct,
+      Rtg = Rating,
+      a_to = ast_to)
+```
+```{r, include=FALSE}
+kable(head(model_data_printing,5), caption = "Table 1. Example of cleaned men's model data")
 ```
 
 We use these cleaned data as the basis for the men’s rating model.
@@ -179,26 +183,34 @@ ESPN’s women’s data do not include reliable positional labels, so we created
 kable(head(women_4099,5))
 ```
 
+# Motivation for Conference Adjustment
+
+Initial outputs revealed clear inconsistencies: players from lower-tier D1 conferences appeared near the top of the ratings despite producing those numbers against comparatively weaker opponents. This confirmed the need for a conference-based adjustment to place players on comparable footing across the country.
+
 ## Conference Strength Modeling
 
 ### Men's 
 
-For men's basketball, we estimated team strength directly from scoring margins using ESPN game results via the hoopR::load_mbb_schedule() function. We restricted to D1 matchups (conf IDs: 1-32) and constructed a matrix where each row encoded a game, with a +1 for the home team, -1 for the away team, andd a shared intercept column. We then solved a least-squares system: 
+Using game results from `hoopR::load_mbb_schedule()` (Gilani, 2024), we restricted to Division I matchups and constructed a least-squares system:
 
 $$(A^T(A) + \lambda(I))\beta = A^T(y)$$
 
 where y is the home-away score margin and $\lambda = 10^{-2}$ is a small penalty. The resulting coefficients were centered with mean zero and then standardized to a z-score, yielding a latent team strength measure (team_z) for each team. 
 
-To quantify strength-of-schedule (SOS), we paired each game with its opponent and averaged opponent team_z values weighted by a small home/away factor (0.9 for a home games and 1.1 for road games). This produced a raw SOS measure for each team, which we standardized to sos_z. Finally, we aggregated to the conference level by averaging team_z and sos_z within each conference and converting these conference means to z-scores (conf_strength_z and conf_sos_z). These two standardized conference-level quantities form inputs to the conference index.
+To quantify strength-of-schedule (sos_z), we averaged opponent team_z values with weights (0.9 home, 1.1 away). We then aggregated to the conference level and standardized conference means to obtain:
+* conference strength (conf_strength_z)
+* conference schedule difficulty (conf_sos_z)
 
-We combined conference-level strength and SOS into a single conference index: ConfIndex = 0.5(Z_strength) + 0.5(Z_sos)
-We then used that for our conference adjustment rating: FinalRating = BaseRating + w(ConfIndex) where w is a tuning parameter controlling adjustment strength
+These form a conference index that adjusts the final player ratings.
 
 ### Women's
 
-For women's basketball, we constructed team and conference strength using ESPN WBB schedules and final scores. From the schedule data, we built a game-level table with home/away team IDs and final scores, then computed score margin as home points minus away points. Using this margin data, we fit a least squares model with +1 for the home team, -1 for the away team, and a shared intercept term, mirroring the men's approach. The resulting team coefficients were centered around mean zero and standardized to obtain a team-strength z-score for each team (team_z_map).
+We replicated the same least-squares approach for women’s schedules using `wehoop`:
+* compute team_z from score margins
+* compute sos_z from weighted opponent strength
+* aggregate to conferences and standardize
 
-We then computed strength-of-schedule (SOS) by pairing each game with its opponent and averaging opponent team-strength z-scores, using a weight of 0.9 for home games and 1.1 for road games to reflect the added difficulty of road atmospheres. This produced a raw SOS value per team, which we standardized to sos_z. To move from teams to conferences, we linked each team to a conference_name from the player table, averaged team-strength values within each conference, and standardized those conference means to obtain a conference-strength z-score conf_z. Finally, we merged team_z, sos_z, and conf_z back into the women's player table (players_enriched_avg) and flagged Power 5 teams (conf_tier_pow5) so that team strength, schedule, and conference tier could all be incorporated into the final women's rating formula. 
+We merged these values back onto the women’s player table and flagged Power-5 programs to incorporate conference tier effects.
 
 ```{r, message=FALSE, warning=FALSE, include=FALSE}
 conf_men = conf_strength_named %>%
@@ -384,4 +396,5 @@ Torvik, Bart. NCAAM Player Stats 2025. barttorvik. https://barttorvik.com/player
 
 Gilani & Hutchinson. `wehoop`: Women's Basketball Data for R: https://github.com/sportsdataverse/wehoop
 
+Gilani, S. `hoopr`: The SportsDataverse's R Package for Men's Basketball Data: https://hoopR.sportsdataverse.org
 
