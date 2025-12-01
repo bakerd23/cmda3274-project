@@ -372,7 +372,6 @@ The model is tuned and validated on the 2024-25 season. It's stable across singl
 
 # References
 
-
 Weatherman A (2024). `cbbdata`: API for College Basketball Data. R package version 0.3.0.9000, https://cbbdata.aweatherman.com/
 
 Kartes, Weston. MBB Player Database 2024. HD Intelligence. https://www.hdintelligence.com/mbb-player-database-2024 
@@ -384,4 +383,5 @@ Torvik, Bart. NCAAM Player Stats 2024. barttorvik. https://barttorvik.com/player
 Torvik, Bart. NCAAM Player Stats 2025. barttorvik. https://barttorvik.com/playerstat.php?year=2025 
 
 Gilani & Hutchinson. `wehoop`: Women's Basketball Data for R: https://github.com/sportsdataverse/wehoop
+
 
