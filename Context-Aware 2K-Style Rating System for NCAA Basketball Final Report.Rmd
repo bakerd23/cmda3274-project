@@ -1,0 +1,362 @@
+---
+title: "Context-Aware 2K-Style Ratings for NCAA Basketball"
+author: Baker Dean & Caleb Ramsey
+output: pdf_document
+---
+
+```{r, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(randomForest)
+mbb_raw <- read.csv("Data/bt2024.csv")
+wbb_raw <- read.csv("Data/wcbb_players_2025_D1.csv")
+men_4099 <- read.csv("Data/men_4099.csv")
+women_4099 <- read.csv("Data/women_4099.csv")
+ratings_23 <- read.csv("Data/ratings_23.csv")
+ratings_24 <- read.csv("Data/ratings_24.csv")
+hdi23 <- read.csv("Data/HDI Ratings 2023-24.csv")
+hdi24 <- read.csv("Data/HDI Ratings 2024-25.csv")
+wcbb_final_ratings = read.csv("Data/wcbb_final_ratings.csv")
+conf_strength_named = read.csv("Data/mbb_conf_strength_named.csv")
+```
+
+# Introduction
+
+## Research Question
+
+How can we create a player rating system for men’s and women’s college basketball that accounts for both player performance and conference strength, allowing staff to compare athletes across divisions and evaluate transfer portal talent more effectively?
+
+## Abstract
+
+In this new age of college basketball, evaluating the talent of players across the nation is more important than ever given the new transfer portal and Name, Image, and Likeness (NIL) rules. Player movement is at an all-time high with teams often turning over more than 75% of their teams every offseason and with players able to be paid for their services coaches and general managers must be aware of the true value of a player, how much to offer him/her and how to allocate all their financial resources. With many players choosing to move between the Power 5 conferences (ACC, Big Ten, Big 12, Big East, and SEC) and the many smaller conferences, evaluating the skill and fit of a player is not as simple as simply pulling ups stats and sorting by points per game. With such a wide variety of levels of talent, determining how to account for the level of competition they faced becomes an important factor alongside the performance of the player.
+
+This project seeks to accurately handle this issue by creating a video-game style player ratings system that will assign every player in the nation a single number that represents the level of competition they faced and their individual performance. We will determine level of competition by analyzing the conference the player played and rate their stats using a model based on previously existing but potentially flawed rankings. We will apply our ratings to the 2024-25 season to evaluate its accuracy since we have full data for that season but the end-goal is a tool that can be used to rank and project player performance when scouting transfer portal players. 
+
+# Methods
+
+## Data Collection
+
+### Men's
+
+For the men's side of the project, collecting the data was a combination of web-scraping and dataset manipulation. HDI is a company that provides a rating system for college basketball players using a variety of advanced statistics. After accessing their data via a Google Sheet that the Virginia Tech Men's Basketball team provided, the HDI ratings and stats were downloaded to a csv that could be imported into this R project. Since part of the goal includes simplify the equation that makes player ratings, the `cbbdata` package (Weatherman, 2024) was used to scrape data from barttorvik.com for the corresponding seasons. After obtaining both of these datasets the two were joined using a customized function to assign HDI ratings to almost all of the players in the barttorvik dataset. Rows that contained NA values and players that only appeared in one of the datasets were removed and special care was taken to handle difficult cases like multiple players with the same name.
+
+```{r, include=FALSE}
+model_data_printing <- read.csv("Data/ratings_24.csv") %>% select(
+  mpg, ppg, rpg, apg, spg, bpg, two_pct, three_pct, ft_pct, tov, ast_to, efg, ts, Rating) %>% mutate(
+    mpg = round(mpg),
+    ppg = round(ppg,1),
+    rpg = round(rpg,1),
+    apg = round(apg,1),
+    spg = round(spg,1),
+    bpg = round(bpg,1),
+    two_pct = round(two_pct*100,1),
+    three_pct = round(three_pct*100,1),
+    ft_pct = round(ft_pct*100,1),
+    tov = round(tov,1),
+    ast_to = round(ast_to,2),
+    ts = round(ts,1)) %>% rename(
+      `2%` = two_pct,
+      `3%` = three_pct,
+      `ft%` = ft_pct,
+      Rtg = Rating,
+      a_to = ast_to)
+```
+```{r, include=FALSE}
+head(model_data_printing,5)
+```
+```{r, include=FALSE}
+mbb_raw_printing <- mbb_raw %>% select(
+  Name, mpg, ppg, rpg, apg, spg, bpg, two_pct, three_pct, ft_pct, tov, ast_to, efg, ts) %>% mutate(
+    mpg = round(mpg),
+    ppg = round(ppg,1),
+    rpg = round(rpg,1),
+    apg = round(apg,1),
+    spg = round(spg,1),
+    bpg = round(bpg,1),
+    two_pct = round(two_pct*100,1),
+    three_pct = round(three_pct*100,1),
+    ft_pct = round(ft_pct*100,1),
+    tov = round(tov,1),
+    ast_to = round(ast_to,2),
+    ts = round(ts,1)) %>% rename(
+      `2%` = two_pct,
+      `3%` = three_pct,
+      `ft%` = ft_pct,
+      a_to = ast_to) %>%
+  arrange(Name)
+```
+```{r}
+head(mbb_raw_printing,5)
+```
+
+This is the data we will use to assign the men's ratings.
+
+### Women's
+
+Data came from ESPN via the `wehoop` package (Gilani & Hutchinson, 2021). We used "load_wbb_player_box()" to collect the 2025 WBB game-by-game box scores and aggregated them into season totals. The 2025 schedule was collected with `load_wbb_schedule` and mapped each team to a conference using available team/conference fields. Manual overrides were added for teams with missing or amiguous conference labels. Minutes listed as "MM:SS" were normalized to decimal minutes, and percentage fields with zero denominators were set to NA. We filtered to Division I teams and enforced a minimum threshold (Minutes = 200, Games Played = 10). 
+
+```{r, include=FALSE}
+wbb_raw_printing <- wbb_raw %>% mutate(
+  mpg = minutes / games_played,
+  ppg = points / games_played,
+  rpg = rebounds / games_played,
+  apg = assists / games_played,
+  spg = steals / games_played,
+  bpg = blocks / games_played,
+  tov = turnovers / games_played,
+  two_fg_made = field_goals_made - three_point_made,
+  two_fg_att  = field_goals_attempted - three_point_attempted,
+  two_pct = ifelse(two_fg_att > 0, two_fg_made / two_fg_att, NA_real_),
+  ast_to = ifelse(turnovers > 0, assists / turnovers, NA_real_),
+  efg = ifelse(field_goals_attempted > 0, (field_goals_made + 0.5 * three_point_made) / field_goals_attempted, NA_real_),
+  ts = ifelse(field_goals_attempted + 0.44 * free_throws_attempted > 0, points / (2 * (field_goals_attempted + 0.44 * free_throws_attempted)), NA_real_)) %>% select(
+    player_name, team_name, mpg, ppg, rpg, apg, spg, bpg, two_pct, three_point_percent, free_throw_percent, tov, ast_to, efg, ts) %>% mutate(
+      mpg = round(mpg),
+      ppg = round(ppg,1),
+      rpg = round(rpg,1),
+      apg = round(apg,1),
+      spg = round(spg,1),
+      bpg = round(bpg,1),
+      two_pct = round(two_pct*100,1),
+      three_point_percent = round(three_point_percent*100,1),
+      free_throw_percent = round(free_throw_percent*100,1),
+      tov = round(tov,1),
+      ast_to = round(ast_to,2),
+      ts = round(ts*100,1),
+      efg = round(efg*100,1)) %>% rename(
+      `2%` = two_pct,
+      `3%` = three_point_percent,
+      `ft%` = free_throw_percent,
+      a_to = ast_to) %>%
+  na.omit() %>%
+  select(-team_name) %>%
+  arrange(player_name)
+```
+```{r}
+head(wbb_raw_printing,5)
+```
+
+This is the data we will use to assign the women's ratings.
+
+## Data Manipulation
+
+After gathering the HDI stats for the men, we trained a random forest model on the data to predict each player's rating from per-game and efficiency statistics: on ppg (points per game), rpg (rebounds per game), apg (assists per game), spg (steals per game), bpg (blocks per game), two_pct (2 point shot percentage), three_pct (3 point shot percentage), ft_pct (free throw percentage), tov (turnovers per game), ast_to (assist to turnover ratio), efg (effective field goal percentage), ts (true shooting percentage), and ftr (free throw rate). We then applied this model to the men's and women's data to assign each player a "statistics score".
+
+On the women's side, ESPN's women's data do not reliably include player positions and no stable scraping was found for positional labels, we generated our own position buckets using a rule-based approach. Players were grouped into guards, wings, or centers, using height, usage-rate, assist-rate, and rebound profile. Guards were defined by high assist rates and perimeter shooting volume, wings by balanced scoring and rebounding profiles, and centers by high rebound and low three-point attempt rates. These buckets were not created to be perfect positional labels; rather, they ensured players were evaluated with role-appropriate scoring formulas rather than a single one-size-fits-all approach. This prevented guards from being penalized for low rebounding and centers from being penalized for low assist rates as their roles within a teams context are very different. We also computed per-game, per-40, and advanced metrics (such as TS%, eFG%, and tendency rates) and converted them into percentile scores. We then used the aforementioned role weights and applied shrinkage and penalties based on minutes, role, and rotation rank. Finally, we combined the position-adjusted stat-score with team and opponent strength-of-schedule and conference strength z-scores, and rescaled the composite to a 2K-style 40-99 rating. This yields a women's "statistics score" that incorporates both box-score production and context. 
+\newpage
+Men's:
+
+```{r}
+head(men_4099,5)
+```
+
+Women's:
+
+```{r}
+head(women_4099,5)
+```
+
+Looking at the outputs it is obvious that we are not finished with the project since players from Ball State and Duquesne are not the top players in the nation but instead putting up excellent stats on bad teams against poor competition. This justifies the need for some form of conference weighting which we will accomplish using strength of schedule and conference performance numbers.
+
+## Conference Strength Modeling
+
+### Men's 
+
+For men's basketball, we estimated team strength directly from scoring margins using ESPN game results via the hoopR::load_mbb_schedule() function. We restricted to D1 matchups (conf IDs: 1-32) and constructed a matrix where each row encoded a game, with a +1 for the home team, -1 for the away team, andd a shared intercept column. We then solved a least-squares system: $(A^T(A) + \lambda(I))\beta = A^T(y)$ where y is the home-away score margin and $\lambda = 10^{-2}$ is a small penalty. The resulting coefficients were centered with mean zero and then standardized to a z-score, yielding a latent team strength measure (team_z) for each team. 
+
+To quantify strength-of-schedule (SOS), we paired each game with its opponent and averaged opponent team_z values weighted by a small home/away factor (0.9 for a home games and 1.1 for road games). This produced a raw SOS measure for each team, which we standardized to sos_z. Finally, we aggregated to the conference level by averaging team_z and sos_z within each conference and converting these conference means to z-scores (conf_strength_z and conf_sos_z). These two standardized conference-level quantities form inputs to the conference index.
+
+We combined conference-level strength and SOS into a single conference index: ConfIndex = 0.5(Z_strength) + 0.5(Z_sos)
+We then used that for our conference adjustment rating: FinalRating = BaseRating + w(ConfIndex) where w is a tuning parameter controlling adjustment strength
+
+### Women's
+
+For women's basketball, we constructed team and conference strength using ESPN WBB schedules and final scores. From the schedule data, we built a game-level table with home/away team IDs and final scores, then computed score margin as home points minus away points. Using this margin data, we fit a least squares model with +1 for the home team, -1 for the away team, and a shared intercept term, mirroring the men's approach. The resulting team coefficients were centered around mean zero and standardized to obtain a team-strength z-score for each team (team_z_map).
+
+We then computed strength-of-schedule (SOS) by pairing each game with its opponent and averaging opponent team-strength z-scores, using a weight of 0.9 for home games and 1.1 for road games to reflect the added difficulty of road atmospheres. This produced a raw SOS value per team, which we standardized to sos_z. To move from teams to conferences, we linked each team to a conference_name from the player table, averaged team-strength values within each conference, and standardized those conference means to obtain a conference-strength z-score conf_z. Finally, we merged team_z, sos_z, and conf_z back into the women's player table (players_enriched_avg) and flagged Power 5 teams (conf_tier_pow5) so that team strength, schedule, and conference tier could all be incorporated into the final women's rating formula. 
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+conf_men = conf_strength_named %>%
+  transmute(
+    gender = "Men",
+    conference = as.factor(conference_id),
+    conf_strength_z = conf_strength_z,
+    conf_sos_z = conf_sos_z
+    )
+
+conf_women = wcbb_final_ratings %>%
+  group_by(conf) %>%
+  summarise(
+    avg_team_z = mean(team_z, na.rm = T),
+    avg_sos_z = mean(sos_z, na.rm = T),
+    .groups = "drop"
+    ) %>%
+  mutate(
+    conf_strength_z = as.numeric(scale(avg_team_z)),
+    conf_sos_z = as.numeric(scale(avg_sos_z))
+    ) %>%
+  transmute(
+    gender = "Women",
+    conference = conf,
+    conf_strength_z,
+    conf_sos_z
+    )
+
+conf_both = bind_rows(conf_men, conf_women)
+
+conf_scatterplot = ggplot(conf_both, aes(x = conf_strength_z, 
+                                  y = conf_sos_z, 
+                                  color = gender)) +
+  geom_hline(yintercept = 0, linewidth = 0.3) +
+  geom_vline(xintercept = 0, linewidth = 0.3) +
+  geom_point(size = 2, alpha = 0.8) +
+  labs(
+    title = "Conference Strength vs.\n Strength of Schedule",
+    x = "Conference strength (z-score)",
+    y = "Conference SOS (z-score)",
+    color = "Gender"
+    ) +
+  theme_minimal(base_size = 11)
+
+conf_hist = ggplot(conf_both, aes(x = conf_strength_z)) +
+  geom_histogram(bins = 10) +
+  facet_wrap(~ gender, ncol = 1) +
+  labs(
+    title = "Distribution of Conference Strength\n (z-scores) by Gender",
+    x = "Conference strength (z-score)",
+    y = "Count"
+    ) + theme_minimal(base_size = 11)
+```
+```{r, fig.width=4, fig.height=3}
+print(conf_scatterplot)
+print(conf_hist)
+```
+
+The histograms indicate that men’s conferences vary more widely in strength, while women’s conferences are more tightly clustered with only a few elite outliers. 
+
+The scatterplot confirms a strong positive relationship between conference strength and schedule difficulty for both genders. Stronger conferences consistently play harder schedules, while weaker conferences play softer ones. 
+
+These findings demonstrate that conference environment has a meaningful impact on player's stats and supports the need for conference-adjusted ratings in our model.
+
+# Analysis
+
+To evaluate how well our statistical model replicates the original HDI ratings, we compared our model's predictions against the actual HDI ratings for the men's basketball players:
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+hdi23_simple <- hdi23 %>%
+  rename(Name = Full.Name, Team = X2023.2024.School) %>%
+  select(Name, Team, Rating)
+
+hdi24_simple <- hdi24 %>%
+  rename(Name = Full.Name, Team = X2024.2025.School) %>%
+  select(Name, Team, Rating)
+
+ratings <- rbind(ratings_23, ratings_24)
+ratings_model_data <- ratings %>% 
+  select(mpg, ppg, rpg, apg, spg, bpg, two_pct, three_pct, ft_pct, 
+         tov, ast_to, efg, ts, ftr, Rating) %>% 
+  na.omit()
+
+set.seed(3274)
+index <- sample(nrow(ratings_model_data), size = floor(0.8*nrow(ratings_model_data)))
+train <- ratings_model_data[index, ]
+test  <- ratings_model_data[-index, ]
+ratings_model <- randomForest(
+  Rating ~ mpg + ppg + rpg + apg + spg + bpg + two_pct + three_pct + 
+           ft_pct + tov + ast_to + efg + ts + ftr,
+  data = train, ntree = 1000, importance = TRUE
+)
+
+ratings_24_comparison <- ratings_24 %>%
+  select(Name, Team, mpg, ppg, rpg, apg, spg, bpg, two_pct, three_pct, 
+         ft_pct, tov, ast_to, efg, ts, ftr, Rating) %>%
+  na.omit()
+
+ratings_24_comparison$predicted_rating <- predict(ratings_model, newdata = ratings_24_comparison)
+
+ratings_24_comparison <- ratings_24_comparison %>%
+  mutate(
+    Our_Rating = 40 + (predicted_rating - min(predicted_rating)) * 
+                  (59 / (max(predicted_rating) - min(predicted_rating)))
+  ) %>%
+  rename(HDI_Rating = Rating)
+
+cor_value <- cor(ratings_24_comparison$HDI_Rating, 
+                 ratings_24_comparison$Our_Rating, 
+                 use = "complete.obs")
+rmse_value <- sqrt(mean((ratings_24_comparison$HDI_Rating - 
+                        ratings_24_comparison$Our_Rating)^2, na.rm = TRUE))
+mean_diff <- mean(ratings_24_comparison$Our_Rating - 
+                  ratings_24_comparison$HDI_Rating, na.rm = TRUE)
+
+plot <- ggplot(ratings_24_comparison, aes(x = HDI_Rating, y = Our_Rating)) +
+  geom_point(alpha = 0.4, size = 2, color = "steelblue") +
+  annotate("text", x = 50, y = 95, 
+           label = paste0("r^2: ", round(cor_value^2, 3)), 
+           hjust = 0, size = 4, fontface = "bold") +
+  labs(
+    title = "HDI vs. Stats Rating 2024-25",
+    x = "HDI Rating",
+    y = "Our Statistical Rating",
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(size = 11),
+    axis.title = element_text(size = 11),
+    plot.caption = element_text(size = 9, hjust = 0)
+  ) +
+  coord_fixed(ratio = 1, xlim = c(40, 100), ylim = c(40, 100))
+```
+```{r, fig.width=5, fig.height=4}
+print(plot)
+```
+
+Since our ratings were scaled to be 40-99 (similar to NBA2K, a basketball video game) and have not been adjusted for conference weight yet, this shape is perfectly reasonable and an indication that the statistical portion of the code is working. There are only a few outliers and the narrowing of the graph at the top is to be expected given a fewer number of elite players. A 91% r^2 value indicates that the stats we used in the model account for 91% of the variability in the ratings which is a great report given that we could not scrape many of the more advanced statistics for the women's players.
+
+## Potential Limitations (so far)
+
+### Mens to womens model translation
+
+One of the problems we ran into was applying a model trained on men's data to the women's game, the original outputs were too low (top players were in the 70s) due to the different paces and styles so this led us to scaling the ratings. 
+
+### Adjusting for conferences on HDI ratings
+
+As we have begun to work on adjusting for conferences on the HDI ratings it is difficult to bring down top mid-major players without destroying the middle tier players from lower conferences so we are still working on a way to balance this out.
+
+```{r, include=FALSE}
+# Unreliable WBB positional data
+# ESPN's women's data do not include reliable position labels, so we created role buckets (guard, wing, center) using rebounding profile, assist-rate, and shooting distribution. This rule-based approach is practical but imperfect; misclassification can affect individual ratings, especially for versatile players. 
+```
+
+### Heavy reliance on box-score stats
+
+Both the men and women's models are constrained to box-score variables because play-by-play and advanced tracking data are unavailable for the full dataset. This limits the model's ability to capture defensive impact, screening, spacing, off-ball value, and other impacts players may have that aren't captured in the traditional box-score. 
+
+### Margin-based team strength models assume linearity
+
+Our team strength estimates rely on least-squares systems that use scoring margins. Margin-based ratings assume linear, symmetric behavior and may overweight blowouts or undervalue teams that eek out close games, especially close wins versus good teams. 
+
+### Small conferences harder to adjust for
+
+Conferences with fewer teams or limited non-conference scheduling leads to unstable conference z-scores that make estimating their strength less reliable.
+
+### Transferability to future seasons untested
+
+The model is tuned and validated on the 2024-25 season. It's stable across single seasons, but tests across multiple seasons, roster turnover patterns, and NIL-induced shifts are not yet validated.
+
+# References
+
+
+Weatherman A (2024). `cbbdata`: API for College Basketball Data. R package version 0.3.0.9000, https://cbbdata.aweatherman.com/
+
+Kartes, Weston. MBB Player Database 2024. HD Intelligence. https://www.hdintelligence.com/mbb-player-database-2024 
+
+Kartes, Weston. MBB Player Database 2025. HD Intelligence. https://www.hdintelligence.com/mbb-player-database-2025 
+
+Torvik, Bart. NCAAM Player Stats 2024. barttorvik. https://barttorvik.com/playerstat.php?year=2024 
+
+Torvik, Bart. NCAAM Player Stats 2025. barttorvik. https://barttorvik.com/playerstat.php?year=2025 
+
+Gilani & Hutchinson. `wehoop`: Women's Basketball Data for R: https://github.com/sportsdataverse/wehoop
+
