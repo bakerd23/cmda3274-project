@@ -352,10 +352,10 @@ kable(men_top5, caption = "Top Men's Players by Conference-Adjusted Rating")
 ```
 
 ```{r, echo=FALSE}
-kable(women_top5, caption = "Top Woen's Players by Conference-Adjusted Rating")
+kable(women_top5, caption = "Top Women's Players by Conference-Adjusted Rating")
 ```
 
-These adjusted rankings seem to be much more realistic, with the top players from top conferences appearing at that, but the next step was to numerically analyze their accuracy. There are 2 ways to accomplish this: 1. Compare our men's ratings to the HDI list to ensure our results are reasonable, even though it was not our goal to duplicate them and 2. Make sure that the teams who have highly rated players were successful. 
+These adjusted rankings seem to be much more realistic, with the top players from top conferences appearing at the top, but the next step was to numerically analyze their accuracy. There are 2 ways to accomplish this: 1. Compare our men's ratings to the HDI list to ensure our results are reasonable, even though it was not our goal to duplicate them and 2. Make sure that the teams who have highly rated players were successful. 
 
 ## HDI Comparison
 
@@ -425,7 +425,7 @@ ggplot(res_adj$data, aes(x = hdi_rating, y = Rating)) +
   )
 ```
 
-The plot shows a very encouraging trend between the two ranking as they follow a similar trendline and there are no extreme outliers. Most of the minor outliers below the trendline are midmajor players with very high stats from very bad conferences, which is reasonable given how we built the algorithm for the rankings.
+The plot shows a very encouraging trend between the two rankings, as they follow a similar trendline and there are no extreme outliers. Most of the minor outliers below the trendline are midmajor players with very high stats from very bad conferences, which is reasonable given how we built the algorithm for the rankings.
 
 To further compare our ratings to HDI, we decided it would be most fair to use the Spearman rho metric to evaluate how similar the ranks of the lists are and then also look at the top 100 players in each set and see how they compared. Here is a table outlining our results:
 
@@ -489,7 +489,7 @@ By combining the analysis of the these methods we can conclude with confidence t
 
 ### Men's-to-women's model translation
 
-One of the problems we ran into was applying a model trained on men's data to the women's game, the original outputs were too low (top players were in the 70s) due to the different paces and styles of play. We compensated for this by scaling the ratings but the women's teams are still slightly lower in general.
+One of the problems we ran into was applying a model trained on men's data to the women's game, the original outputs were too low (top players were in the 70s) due to the different paces and styles of play. We compensated for this by scaling the ratings, but the women's teams are still slightly lower in general.
 
 ### Heavy reliance on box-score stats
 
@@ -523,3 +523,4 @@ Gilani & Hutchinson. `wehoop`: Women's Basketball Data for R: https://github.com
 
 
 Gilani, S. `hoopr`: The SportsDataverse's R Package for Men's Basketball Data: https://hoopR.sportsdataverse.org
+
