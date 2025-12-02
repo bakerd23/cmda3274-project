@@ -246,10 +246,10 @@ conf_hist = ggplot(conf_both, aes(x = conf_strength_z)) +
     y = "Count"
     ) + theme_minimal(base_size = 11)
 ```
-```{r conf_scatter, fig.width=3.5, fig.height=2.5, fig.align='center', echo=FALSE, fig.cap = "Conference strength across men's and women's conferences"}
+```{r conf_scatter, fig.width=3.5, fig.height=2.5, fig.align='center', echo=FALSE, fig.cap = "Conference strength vs. strength of schedule for men's and women's conferences"}
 conf_scatterplot
 ```
-```{r conf_hist, echo = FALSE, fig.width=3.5, fig.height=2.5, fig.align='center', fig.cap="Conference strength vs. strength of schedule for men's and women's conferences."}
+```{r conf_hist, echo = FALSE, fig.width=3.5, fig.height=2.5, fig.align='center', fig.cap="Conference strength across men's and women's conferences"}
 conf_hist
 ```
 
@@ -520,5 +520,6 @@ Torvik, Bart. NCAAM Player Stats 2024. barttorvik. https://barttorvik.com/player
 Torvik, Bart. NCAAM Player Stats 2025. barttorvik. https://barttorvik.com/playerstat.php?year=2025 
 
 Gilani & Hutchinson. `wehoop`: Women's Basketball Data for R: https://github.com/sportsdataverse/wehoop
+
 
 Gilani, S. `hoopr`: The SportsDataverse's R Package for Men's Basketball Data: https://hoopR.sportsdataverse.org
