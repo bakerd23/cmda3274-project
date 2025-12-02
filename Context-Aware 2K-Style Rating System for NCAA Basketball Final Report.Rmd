@@ -1,7 +1,10 @@
 ---
 title: "Context-Aware 2K-Style Ratings for NCAA Basketball"
 author: Baker Dean & Caleb Ramsey
-output: pdf_document
+output: 
+  pdf_document: default
+header-includes:
+  - \usepackage{float}
 ---
 
 ```{r, include=FALSE}
@@ -374,6 +377,7 @@ Torvik, Bart. NCAAM Player Stats 2025. barttorvik. https://barttorvik.com/player
 Gilani & Hutchinson. `wehoop`: Women's Basketball Data for R: https://github.com/sportsdataverse/wehoop
 
 Gilani, S. `hoopr`: The SportsDataverse's R Package for Men's Basketball Data: https://hoopR.sportsdataverse.org
+
 
 
 
