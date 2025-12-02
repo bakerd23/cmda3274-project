@@ -244,16 +244,16 @@ conf_hist = ggplot(conf_both, aes(x = conf_strength_z)) +
     y = "Count"
     ) + theme_minimal(base_size = 11)
 ```
-```{r, fig.width=4, fig.height=3}
+```{r conf_scatter, fig.width=4, fig.height=3, fig.align='center', echo=FALSE, fig.cap = "Conference strength across men's and women's conferences"}
 conf_scatterplot
+```
+```{r conf_hist, echo = FALSE, fig.width=4, fig.height=3, fig.align='center', fig.cap="Conference strength vs. strength of schedule for men's and women's conferences."}
 conf_hist
 ```
 
-The histograms indicate that men’s conferences vary more widely in strength, while women’s conferences are more tightly clustered with only a few elite outliers. 
+As shown in Figure 2, conference strength and schedule difficulty are strongly and positively related for both men’s and women’s leagues. Stronger conferences cluster in the upper-right quadrant, while weaker conferences cluster in the lower-left.
 
-The scatterplot confirms a strong positive relationship between conference strength and schedule difficulty for both genders. Stronger conferences consistently play harder schedules, while weaker conferences play softer ones. 
-
-These findings demonstrate that conference environment has a meaningful impact on player's stats and supports the need for conference-adjusted ratings in our model.
+Figure 3 shows that men’s conference strength z-scores are more widely dispersed than women’s, which are tightly clustered with only a few elite outliers. Together, Figures 2 and 3 motivate incorporating conference strength into our rating system rather than relying on raw box-score production alone.
 
 # Analysis
 
@@ -377,6 +377,7 @@ Torvik, Bart. NCAAM Player Stats 2025. barttorvik. https://barttorvik.com/player
 Gilani & Hutchinson. `wehoop`: Women's Basketball Data for R: https://github.com/sportsdataverse/wehoop
 
 Gilani, S. `hoopr`: The SportsDataverse's R Package for Men's Basketball Data: https://hoopR.sportsdataverse.org
+
 
 
 
