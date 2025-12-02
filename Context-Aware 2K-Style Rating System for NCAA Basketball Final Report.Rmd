@@ -75,8 +75,8 @@ mbb_raw_printing <- mbb_raw %>% select(
       a_to = ast_to) %>%
   arrange(Name)
 ```
-```{r, include = FALSE}
-kable(head(mbb_raw_printing,5), caption = "Table 1. Example of raw men's model data")
+```{r, echo = FALSE}
+kable(head(mbb_raw_printing,5), caption = "Example of raw men's model data")
 ```
 ```{r, include=FALSE}
 model_data_printing <- read.csv("Data/ratings_24.csv") %>% select(
@@ -99,8 +99,8 @@ model_data_printing <- read.csv("Data/ratings_24.csv") %>% select(
       Rtg = Rating,
       a_to = ast_to)
 ```
-```{r, include=FALSE}
-kable(head(model_data_printing,5), caption = "Table 2. Example of cleaned men's model data")
+```{r, echo=FALSE}
+kable(head(model_data_printing,5), caption = "Example of cleaned men's model data")
 ```
 
 We use these cleaned data as the basis for the men’s rating model.
@@ -113,44 +113,22 @@ Women's data were collected from ESPN via the `wehoop` package (Gilani & Hutchin
 We aggregated player box scores to season totals and standardized minutes, shooting percentages, and efficiency metrics. Teams with ambiguous conference IDs were resolved manually. We restricted the dataset to Division I teams and enforced a minimum threshold (Minutes = 200, Games Played = 10). 
 
 ```{r, include=FALSE}
-wbb_raw_printing <- wbb_raw %>% mutate(
-  mpg = minutes / games_played,
-  ppg = points / games_played,
-  rpg = rebounds / games_played,
-  apg = assists / games_played,
-  spg = steals / games_played,
-  bpg = blocks / games_played,
-  tov = turnovers / games_played,
-  two_fg_made = field_goals_made - three_point_made,
-  two_fg_att  = field_goals_attempted - three_point_attempted,
-  two_pct = ifelse(two_fg_att > 0, two_fg_made / two_fg_att, NA_real_),
-  ast_to = ifelse(turnovers > 0, assists / turnovers, NA_real_),
-  efg = ifelse(field_goals_attempted > 0, (field_goals_made + 0.5 * three_point_made) / field_goals_attempted, NA_real_),
-  ts = ifelse(field_goals_attempted + 0.44 * free_throws_attempted > 0, points / (2 * (field_goals_attempted + 0.44 * free_throws_attempted)), NA_real_)) %>% select(
-    player_name, team_name, mpg, ppg, rpg, apg, spg, bpg, two_pct, three_point_percent, free_throw_percent, tov, ast_to, efg, ts) %>% mutate(
+wbb_data_printing <- wcbb_final_ratings %>% select(
+    player, team, mpg, ppg, rpg, apg, spg, bpg, efg, ts) %>% mutate(
       mpg = round(mpg),
       ppg = round(ppg,1),
       rpg = round(rpg,1),
       apg = round(apg,1),
       spg = round(spg,1),
       bpg = round(bpg,1),
-      two_pct = round(two_pct*100,1),
-      three_point_percent = round(three_point_percent*100,1),
-      free_throw_percent = round(free_throw_percent*100,1),
-      tov = round(tov,1),
-      ast_to = round(ast_to,2),
       ts = round(ts*100,1),
-      efg = round(efg*100,1)) %>% rename(
-      `2%` = two_pct,
-      `3%` = three_point_percent,
-      `ft%` = free_throw_percent,
-      a_to = ast_to) %>%
+      efg = round(efg*100,1)) %>%
   na.omit() %>%
-  select(-team_name) %>%
-  arrange(player_name)
+  select(-team) %>%
+  arrange(player)
 ```
-```{r, include = FALSE}
-kable(head(wbb_raw_printing,5), caption = "Table 3. Example of raw women's model data")
+```{r, echo = FALSE}
+kable(head(wbb_data_printing,5), caption = "Example of cleaned women's model data")
 ```
 
 These processed data serve as the basis for the women’s rating model.
@@ -170,16 +148,16 @@ We trained a random forest model to predict HDI ratings using per-game and effic
 
 This model produces a statistics score that captures each player’s individual production independent of conference effects. We apply this model to both the men's (Table 4) and women's (Table 5) datasets.
 
-```{r, include = FALSE}
-kable(head(men_4099,5), caption = "Table 4. Men's HDI data")
+```{r, echo = FALSE}
+kable(head(men_4099,5), caption = "Men's Data")
 ```
 
 ### Women's Role-Adjusted Model
 
 ESPN’s women’s data do not include reliable positional labels, so we created three role buckets: guard, wing, center. These buckets use simple rules based on height, assist rate, rebounding profile, and shooting tendencies. The goal was not perfect positional classification, but to ensure players were evaluated relative to the expectations of their role. For each player we computed per-game and advanced metrics (TS%, eFG%, usage proxies) and converted them into percentile scores. We then combined these percentiles with role-specific weights. Finally, we integrated team strength, opponent strength-of-schedule, and conference strength to produce a composite rating scaled to 40–99.
 
-```{r, include = FALSE}
-kable(head(women_4099,5), caption = "Table 5. Women's HDI data")
+```{r, echo = FALSE}
+kable(head(women_4099,5), caption = "Women's Data")
 ```
 
 # Motivation for Conference Adjustment
@@ -396,5 +374,6 @@ Torvik, Bart. NCAAM Player Stats 2025. barttorvik. https://barttorvik.com/player
 Gilani & Hutchinson. `wehoop`: Women's Basketball Data for R: https://github.com/sportsdataverse/wehoop
 
 Gilani, S. `hoopr`: The SportsDataverse's R Package for Men's Basketball Data: https://hoopR.sportsdataverse.org
+
 
 
