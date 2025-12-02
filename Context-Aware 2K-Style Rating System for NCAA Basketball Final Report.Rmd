@@ -111,8 +111,11 @@ We use these cleaned data as the basis for the men’s rating model.
 ### Women's
 
 Women's data were collected from ESPN via the `wehoop` package (Gilani & Hutchinson, 2021):
+
 * `load_wbb_player_box()` provided game-level box scores for all players in the 2025 season.
+
 * `load_wbb_schedule` provided team IDs, opponents, and conference fields used in conference assignment.
+
 We aggregated player box scores to season totals and standardized minutes, shooting percentages, and efficiency metrics. Teams with ambiguous conference IDs were resolved manually. We restricted the dataset to Division I teams and enforced a minimum threshold (Minutes = 200, Games Played = 10). 
 
 ```{r, include=FALSE}
@@ -178,6 +181,7 @@ $$(A^T(A) + \lambda(I))\beta = A^T(y)$$
 where y is the home-away score margin and $\lambda = 10^{-2}$ is a small penalty. The resulting coefficients were centered with mean zero and then standardized to a z-score, yielding a latent team strength measure (team_z) for each team. 
 
 To quantify strength-of-schedule (sos_z), we averaged opponent team_z values with weights (0.9 home, 1.1 away). We then aggregated to the conference level and standardized conference means to obtain:
+
 * conference strength (conf_strength_z)
 * conference schedule difficulty (conf_sos_z)
 
@@ -186,6 +190,7 @@ These form a conference index that adjusts the final player ratings.
 ### Women's
 
 We replicated the same least-squares approach for women’s schedules using `wehoop`:
+
 * compute team_z from score margins
 * compute sos_z from weighted opponent strength
 * aggregate to conferences and standardize
@@ -377,8 +382,3 @@ Torvik, Bart. NCAAM Player Stats 2025. barttorvik. https://barttorvik.com/player
 Gilani & Hutchinson. `wehoop`: Women's Basketball Data for R: https://github.com/sportsdataverse/wehoop
 
 Gilani, S. `hoopr`: The SportsDataverse's R Package for Men's Basketball Data: https://hoopR.sportsdataverse.org
-
-
-
-
-
