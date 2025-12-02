@@ -31,14 +31,14 @@ How can we create a player rating system for men’s and women’s college baske
 
 Player evaluation has become more complex than ever in this era of transfer portal and Name, Image, and Likeness (NIL) rules. Player movement is at an all-time high with teams often turning over more than 75% of their teams every offseason and with players able to be paid for their services coaches and general managers must be aware of the true value of a player, how much to offer him/her and how to allocate all their financial resources. With many players choosing to move between the Power 5 conferences (ACC, Big Ten, Big 12, Big East, and SEC) and the many smaller conferences, evaluating the skill and fit of a player is not as simple as simply pulling up stats and sorting by points per game. With such a wide variety of levels of talent, determining how to account for the level of competition they faced becomes an important factor alongside the performance of the player.
 
-This project develops a video-game style player ratings system that combines box-score performance with measures of conference strength and schedule difficulty. We use existing HDI ratings (Kartes, 2024) as a baseline model for men's data, then extend,scale, and adapt that framework to the women's game. After constructing conference-level strength metrics, we apply adjustments that account for opponent difficulty and competitive environment. Our long-term goal is a transferable rating system that supports coaching staffs in scouting, rescruiting, and evaluating transfer-portal talent.
+This project develops a video-game style player ratings system that combines box-score performance with measures of conference strength and schedule difficulty. We use existing HDI ratings (Kartes, 2024) as a baseline model for men's data, then extend,scale, and adapt that framework to the women's game. After constructing conference-level strength metrics, we apply adjustments that account for opponent difficulty and competitive environment. Our long-term goal is a transferable rating system that supports coaching staffs in scouting, recruiting, and evaluating transfer-portal talent.
 
 # Methods
 ```{r fig.cap = "Figure 1. Pipeline diagram", out.width = "80%"}
 include_graphics("Data/Pipeline_Diagram.png")
 ```
 
-Figure 1 illustrates the four-step pipeline used in this project: data collection, cleaning, modeling, and conference adjustment.
+Figure 1 illustrates the pipeline used in this project: data collection, cleaning, modeling, and conference adjustment.
 
 ## Data Collection
 
@@ -52,8 +52,7 @@ HDI ratings & player statistics, accessed through a Google Sheet provided by Vir
 2\.
 Barttorvik statistics (Torvik, 2024), scraped using the `cbbdata` package (Weatherman, 2024) for the corresponding seasons.
 
-The two datasets were joined using a custom matching function designed to handle inconsistencies in naming and duplicate names across teams.
-Players appearing in only one dataset or with incomplete records were removed.
+The two datasets were joined using a custom matching function designed to handle inconsistencies in naming and duplicate names across teams. Players appearing in only one dataset or with incomplete records were removed. An example of the raw dataset can be seen in Table 1 and the cleaned dataset in Table 2.
 
 ```{r, include=FALSE}
 mbb_raw_printing <- mbb_raw %>% select(
@@ -77,7 +76,7 @@ mbb_raw_printing <- mbb_raw %>% select(
   arrange(Name)
 ```
 ```{r, include = FALSE}
-kable(head(mbb_raw_printing,5), caption = "Table 2. Example of raw men's model data")
+kable(head(mbb_raw_printing,5), caption = "Table 1. Example of raw men's model data")
 ```
 ```{r, include=FALSE}
 model_data_printing <- read.csv("Data/ratings_24.csv") %>% select(
@@ -101,7 +100,7 @@ model_data_printing <- read.csv("Data/ratings_24.csv") %>% select(
       a_to = ast_to)
 ```
 ```{r, include=FALSE}
-kable(head(model_data_printing,5), caption = "Table 1. Example of cleaned men's model data")
+kable(head(model_data_printing,5), caption = "Table 2. Example of cleaned men's model data")
 ```
 
 We use these cleaned data as the basis for the men’s rating model.
@@ -151,7 +150,7 @@ wbb_raw_printing <- wbb_raw %>% mutate(
   arrange(player_name)
 ```
 ```{r, include = FALSE}
-kable(head(wbb_raw_printing,5))
+kable(head(wbb_raw_printing,5), caption = "Table 3. Example of raw women's model data")
 ```
 
 These processed data serve as the basis for the women’s rating model.
@@ -169,10 +168,10 @@ We trained a random forest model to predict HDI ratings using per-game and effic
 * turnovers and assist-to-turnover ratio (A/TO)
 * free-throw rate (FTR)
 
-This model produces a statistics score that captures each player’s individual production independent of conference effects. We apply this model to both the men's and women's datasets.
+This model produces a statistics score that captures each player’s individual production independent of conference effects. We apply this model to both the men's (Table 4) and women's (Table 5) datasets.
 
 ```{r, include = FALSE}
-kable(head(men_4099,5))
+kable(head(men_4099,5), caption = "Table 4. Men's HDI data")
 ```
 
 ### Women's Role-Adjusted Model
@@ -180,7 +179,7 @@ kable(head(men_4099,5))
 ESPN’s women’s data do not include reliable positional labels, so we created three role buckets: guard, wing, center. These buckets use simple rules based on height, assist rate, rebounding profile, and shooting tendencies. The goal was not perfect positional classification, but to ensure players were evaluated relative to the expectations of their role. For each player we computed per-game and advanced metrics (TS%, eFG%, usage proxies) and converted them into percentile scores. We then combined these percentiles with role-specific weights. Finally, we integrated team strength, opponent strength-of-schedule, and conference strength to produce a composite rating scaled to 40–99.
 
 ```{r, include = FALSE}
-kable(head(women_4099,5))
+kable(head(women_4099,5), caption = "Table 5. Women's HDI data")
 ```
 
 # Motivation for Conference Adjustment
@@ -353,7 +352,7 @@ Since our ratings were scaled to be 40-99 (similar to NBA2K, a basketball video 
 
 ## Potential Limitations (so far)
 
-### Mens to womens model translation
+### Men's-to-women's model translation
 
 One of the problems we ran into was applying a model trained on men's data to the women's game, the original outputs were too low (top players were in the 70s) due to the different paces and styles so this led us to scaling the ratings. 
 
@@ -372,7 +371,7 @@ Both the men and women's models are constrained to box-score variables because p
 
 ### Margin-based team strength models assume linearity
 
-Our team strength estimates rely on least-squares systems that use scoring margins. Margin-based ratings assume linear, symmetric behavior and may overweight blowouts or undervalue teams that eek out close games, especially close wins versus good teams. 
+Our team strength estimates rely on least-squares systems that use scoring margins. Margin-based ratings assume linear, symmetric behavior and may overweight blowouts or undervalue teams that eke out close games, especially close wins versus good teams. 
 
 ### Small conferences harder to adjust for
 
@@ -397,4 +396,5 @@ Torvik, Bart. NCAAM Player Stats 2025. barttorvik. https://barttorvik.com/player
 Gilani & Hutchinson. `wehoop`: Women's Basketball Data for R: https://github.com/sportsdataverse/wehoop
 
 Gilani, S. `hoopr`: The SportsDataverse's R Package for Men's Basketball Data: https://hoopR.sportsdataverse.org
+
 
